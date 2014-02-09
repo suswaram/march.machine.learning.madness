@@ -1,3 +1,5 @@
+library(plyr)
+
 regular_season_results <- read.csv("~/Projects/Kaggle/March Madness/regular_season_results.csv")
 sample_submission <- read.csv("~/Projects/Kaggle/March Madness/sample_submission.csv")
 seasons <- read.csv("~/Projects/Kaggle/March Madness/seasons.csv")
@@ -16,3 +18,24 @@ seed_submission <- read.csv("~/Projects/Kaggle/March Madness/seed_submission.csv
 cm_submission <- read.csv("~/Projects/Kaggle/March Madness/cm_submission.csv")
 chessmetrics <- read.csv("~/Projects/Kaggle/March Madness/chessmetrics.csv")
 
+head(regular_season_results)
+wteam_diff <- regular_season_results$wscore-regular_season_results$lscore
+wteam_diff <- cbind(regular_season_results$season,regular_season_results$wteam,wteam_diff)
+lteam_diff <- regular_season_results$lscore-regular_season_results$wscore
+lteam_diff <- cbind(regular_season_results$season,regular_season_results$lteam,lteam_diff)
+colnames(all_diff) <- c("season","team","diff")
+
+a_train <- regular_season_results[regular_season_results$season=="A",]
+a_test <- tourney_results[tourney_results$season=="A",]
+
+## what do we do about neutral sites?
+homeaway <- function(wteam,lteam,wloc) {
+  hteam <- ifelse(wloc=="H",wteam,lteam)
+  ateam <- ifelse(wloc=="H",lteam,wteam)
+  loc <- ifelse(wloc=="H",1,0)
+  cbind(hteam,ateam,loc)
+}
+a_train[c("hteam","lteam","loc")] <- homeaway(wteam,lteam,wloc)
+head(a_train)
+## basic logistic regression based on home and away status of each team
+glm(data=a_train,loc~factor(hteam)+factor(ateam))
