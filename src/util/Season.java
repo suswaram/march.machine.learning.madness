@@ -72,5 +72,40 @@ public class Season {
 	public boolean hasTeam(String name){
 		return(teams.containsKey(name));
 	}
+	
+	public void resetRatings(){
+		
+		for (Team tm : this.teams.values()){
+			tm.resetRating();
+			this.teams.put(tm.getName(), tm);
+		}
+		
+	}
+	
+	public void resetOppRatings(){
+		
+		for (Team tm : this.teams.values()){
+			tm.resetOppRatings();
+			this.teams.put(tm.getName(), tm);
+		}
+	}
+	
+	public void calcNeighborRatings(){
+		
+		Team awayTm, homeTm;
+		resetOppRatings();
+		
+		for (Game gm : this.regGames){
+			
+			awayTm = this.teams.get(gm.getAwayTeam().getName());
+			homeTm = this.teams.get(gm.getHomeTeam().getName());
+			
+			awayTm.addOppo(homeTm);
+			homeTm.addOppo(awayTm);
+			
+			this.teams.put(awayTm.getName(), awayTm);
+			this.teams.put(homeTm.getName(), homeTm);
+		}
+	}
 
 }

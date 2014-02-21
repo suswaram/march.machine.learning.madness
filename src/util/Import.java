@@ -12,13 +12,13 @@ public class Import {
 		BufferedReader br = null;
 		String line, wteamstr, lteamstr, wloc;
 		int daynum, wscore, lscore;
-		boolean neutralLoc;
 		Season season;
 		Team wteam, lteam;
 		Game gm;
 		
 		String cvsSplitBy = ",";
 		season = new Season();
+		
 		try {
 			
 			br = new BufferedReader(new FileReader(filePath));

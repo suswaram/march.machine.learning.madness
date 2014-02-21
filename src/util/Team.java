@@ -10,8 +10,8 @@ public class Team {
 	public Team(String name){
 		this.name = name;
 		this.eloRating = 0.0;
-		numNeighbors = 0;
-		neighborSum = 0.0;
+		this.numNeighbors = 0;
+		this.neighborSum = 0.0;
 	}
 	
 	/*
@@ -29,6 +29,10 @@ public class Team {
 		return(this.neighborSum/this.numNeighbors);
 	}
 	
+	public int getNumOpp(){
+		return(this.numNeighbors);
+	}
+	
 	/*
 	 * Setters
 	 */
@@ -38,6 +42,20 @@ public class Team {
 	
 	public void setRating(Double rating){
 		this.eloRating = rating;
+	}
+	
+	public void resetRating(){
+		this.eloRating = 0.0;
+	}
+	
+	public void resetOppRatings(){
+		this.neighborSum = 0.0;
+		this.numNeighbors = 0;
+	}
+	
+	public void addOppo(Team tm){
+		this.neighborSum += tm.getRating();
+		this.neighborSum++;
 	}
 	
 
