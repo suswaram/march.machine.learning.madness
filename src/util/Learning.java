@@ -19,7 +19,9 @@ public abstract class Learning {
 		HashMap<String, Team> teams;
 		
 		for (int p = 0; p < P; p++){
+			/* what is eta?? */
 			eta = Math.pow(((1 + 0.1 * P)/(p + 0.1 * P)), .602);
+			/* sum all opponent ratings for each team*/
 			season.calcNeighborRatings();
 			games = season.getRegGames();
 			teams = season.getTeams();
@@ -28,12 +30,16 @@ public abstract class Learning {
 				homeTm = teams.get(gm.getHomeTeam().getName());
 				awayTm = teams.get(gm.getAwayTeam().getName());
 				
+				/* elo ratings, probably want to use a different rating since elo does not take
+				into account score differentials*/
 				rraway = awayTm.getRating();
 				rrhome = homeTm.getRating();
 				
-				ohat = logistic(rrhome + gamma - rraway);
+				/* I'm assuming we should test multiple gammas, alphas, and lambdas */
+				ohat = logistic(rrhome + gamma - rraway); 
 				oo = logistic(alpha * (gm.getHomeScore() - gm.getAwayScore()));
 				
+				/* is one of the rraway equations a +- typoe?*/
 				rrhome = rrhome - eta * (ohat - oo) * ohat * (1 - ohat);
 				rraway = rraway + eta * (ohat - oo) * ohat * (1 - ohat);
 				
