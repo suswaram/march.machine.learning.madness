@@ -17,6 +17,9 @@ rpi_submission <- read.csv("~/Projects/Kaggle/March Madness/rpi_submission.csv")
 seed_submission <- read.csv("~/Projects/Kaggle/March Madness/seed_submission.csv")
 cm_submission <- read.csv("~/Projects/Kaggle/March Madness/cm_submission.csv")
 chessmetrics <- read.csv("~/Projects/Kaggle/March Madness/chessmetrics.csv")
+## devon's ratings
+final_scores <- read.csv("~/Projects/Kaggle/March Madness/final_scores.csv", header=F)
+colnames(final_scores) <- c("season", "team", "dev_rating")
 
 library(randomForest)
 
@@ -24,67 +27,70 @@ last_sag <- subset(sagp_weekly_ratings, rating_day_num==133)[,c(1,4,5)]
 last_chess <- subset(chessmetrics, rating_day_num==133)[,c(1,3,4)]
 chess_sag <- merge(last_chess, last_sag, by.x=c("season", "team"),
                    by.y=c("season", "team"), all.x=T)
-chess_sag_lm <- lm(data=chess_sag, rating.y~rating.x)
-pred_sag <- ifelse(chess_sag$season %in% c("A","B","C","D","E"),
-                   predict(chess_sag_lm, newdata=subset(chess_sag, season %in% c("A","B","C","D","E"))),
+chess_sag_dev <- merge(chess_sag, final_scores,
+                       by.x=c("season", "team"), by.y=c("season", "team"),
+                       all.x=T)
+chess_sag_dev_lm <- lm(data=chess_sag_dev, rating.y~rating.x*dev_rating+rating.x+dev_rating)
+pred_sag <- ifelse(chess_sag_dev$season %in% c("A","B","C","D","E"),
+                   predict(chess_sag_dev_lm, newdata=subset(chess_sag_dev, season %in% c("A","B","C","D","E"))),
                    chess_sag$rating.y)
-chess_sag <- cbind(chess_sag, pred_sag)
+chess_sag_dev <- cbind(chess_sag_dev[,c(1:3,5)], pred_sag)
+colnames(chess_sag_dev) <- c("season", "team", "chess", "sag", "dev")
 
-tourney_results <- merge(tourney_results, last_chess,
+tourney_results <- merge(tourney_results, chess_sag_dev,
                          by.x=c("season","wteam"), by.y=c("season","team"),
                          all.x=T)
-tourney_results <- merge(tourney_results, chess_sag$pred_sag,
-                         by.x=c("season","wteam"), by.y=c("season","team"),
-                         all.x=T)
-colnames(tourney_results) <- c(colnames(tourney_results)[1:7],"wrating_chess","wrating_sag")
-tourney_results <- merge(tourney_results, last_chess, by.x=c("season","lteam"),
+colnames(tourney_results) <- c(colnames(tourney_results)[1:7],
+                               "wrating_chess", "wrating_sag", "wrating_dev")
+tourney_results <- merge(tourney_results, chess_sag_dev, by.x=c("season","lteam"),
                          by.y=c("season","team"), all.x=T)
-tourney_results <- merge(tourney_results, chess_sag$pred_sag, by.x=c("season","lteam"),
-                         by.y=c("season","team"), all.x=T)
-colnames(tourney_results) <- c(colnames(tourney_results)[1:9],"lrating_chess","lrating_sag")
-tourney_results[,c("grating_chess", "grating_sag", "brating_chess", "brating_sag", "gscore", "bscore")] <-
-    ifelse(
-      c(tourney_results$wrating_chess>tourney_results$lrating_chess,
-        tourney_results$wrating_chess>tourney_results$lrating_chess,
-        tourney_results$wrating_chess>tourney_results$lrating_chess,
-        tourney_results$wrating_chess>tourney_results$lrating_chess,
-        tourney_results$wrating_chess>tourney_results$lrating_chess,
-        tourney_results$wrating_chess>tourney_results$lrating_chess),
-      c(tourney_results$wrating_chess,tourney_results$wrating_sag,
-        tourney_results$lrating_chess,tourney_results$lrating_sag,
-        tourney_results$wscore,tourney_results$lscore),
-      c(tourney_results$lrating_chess,tourney_results$lrating_sag,
-        tourney_results$wrating_chess,tourney_results$wrating_sag,
-        tourney_results$lscore,tourney_results$wscore))
+colnames(tourney_results) <- c(colnames(tourney_results)[1:10],
+                               "lrating_chess", "lrating_sag", "lrating_dev")
+tourney_results[,c("grating_chess", "grating_sag", "grating_dev",
+                   "brating_chess", "brating_sag", "brating_dev",
+                   "gscore", "bscore")] <-
+  ifelse(
+    c(tourney_results$wrating_chess>tourney_results$lrating_chess,
+      tourney_results$wrating_chess>tourney_results$lrating_chess,
+      tourney_results$wrating_chess>tourney_results$lrating_chess,
+      tourney_results$wrating_chess>tourney_results$lrating_chess,
+      tourney_results$wrating_chess>tourney_results$lrating_chess,
+      tourney_results$wrating_chess>tourney_results$lrating_chess,
+      tourney_results$wrating_chess>tourney_results$lrating_chess,
+      tourney_results$wrating_chess>tourney_results$lrating_chess),
+    c(tourney_results$wrating_chess,tourney_results$wrating_sag,tourney_results$wrating_dev,
+      tourney_results$lrating_chess,tourney_results$lrating_sag,tourney_results$lrating_dev,
+      tourney_results$wscore,tourney_results$lscore),
+    c(tourney_results$lrating_chess,tourney_results$lrating_sag,tourney_results$lrating_dev,
+      tourney_results$wrating_chess,tourney_results$wrating_sag,tourney_results$wrating_dev,
+      tourney_results$lscore,tourney_results$wscore))
 tourney_results$diff <- tourney_results$gscore-tourney_results$bscore
 tourney_results$win <- ifelse(tourney_results$diff>0,1,0)
 
-train <- subset(tourney_results,season %in% c("K","E","I","P","R","C","D","A","L","J"))
-cross <- subset(tourney_results,season %in% c("F","G","H","B"))
-test <- subset(tourney_results,season %in% c("O","M","Q"))
+train <- subset(tourney_results,season %in% c("G", "Q", "M", "R", "J", "A", "E", "L", "H", "C", "O"))
+cross <- subset(tourney_results,season %in% c("k","F","B","P"))
+test <- subset(tourney_results,season %in% c("I","N","D"))
 
-marchRf <- randomForest(x=train[,12:15], y=train$diff, keep.forest=T,
-                        xtest=cross[,12:15], ytest=cross$diff,
+marchRf <- randomForest(x=train[,14:19], y=train$win, keep.forest=T,
+                        xtest=cross[,14:19], ytest=cross$win,
                         ntree=4500, norm.votes=T)
 
-results <- cbind(predict(marchRf,test[,c(12:15,18)]), test$diff, test$win)
-colnames(results) <- c("pred","actual","win")
+results <- cbind(predict(marchRf,
+                         newdata=rbind(train, cross)[,c(14:19,23)]),
+                 rbind(train, cross)[,23])
+colnames(results) <- c("pred","win")
 results <- as.data.frame(results)
-table(results$pred>0 & results$actual>0)
-win_prob <- glm(data=results, win~pred, family=binomial)
-results <- cbind(results, win_prob$fitted)
-colnames(results)[4] <- "win_pred"
+table(results$pred>.5 & results$win==1)
 
 library(Metrics)
 
-logLoss(results$win, results$win_pred)
+## for training/cross data
+logLoss(results$win, results$pred) ##.3069634
 
-all_results <- cbind(predict(marchRf,tourney_results[,c(12:15,18)]), tourney_results$diff, tourney_results$win)
-colnames(all_results) <- c("pred", "actual", "win")
-all_results <- as.data.frame(all_results)
-table(all_results$pred>0 & all_results$actual>0)
-win_prob_all <- glm(data=all_results, win~pred, family=binomial)
-all_results <- cbind(all_results, win_prob_all$fitted.values)
-colnames(all_results)[4] <- "win_pred"
+test_results <- cbind(predict(marchRf,test[,c(14:19,23)]),
+                      test[,23])
+colnames(test_results) <- c("pred", "win")
+test_results <- as.data.frame(test_results)
+table(test_results$pred>.5 & test_results$win==1)
 
-logLoss(all_results$win, all_results$win_pred)
+logLoss(test_results$win, test_results$pred) ## .5166712
