@@ -25,6 +25,7 @@ library(randomForest)
 
 last_sag <- subset(sagp_weekly_ratings, rating_day_num==133)[,c(1,4,5)]
 last_chess <- subset(chessmetrics, rating_day_num==133)[,c(1,3,4)]
+last_rpi <- subset(rpi, rating_day_num=133)[,c(1,3,7)]
 chess_sag <- merge(last_chess, last_sag, by.x=c("season", "team"),
                    by.y=c("season", "team"), all.x=T)
 chess_sag_dev <- merge(chess_sag, final_scores,
@@ -64,20 +65,27 @@ tourney_results[,c("grating_chess", "grating_sag", "grating_dev",
     c(tourney_results$lrating_chess,tourney_results$lrating_sag,tourney_results$lrating_dev,
       tourney_results$wrating_chess,tourney_results$wrating_sag,tourney_results$wrating_dev,
       tourney_results$lscore,tourney_results$wscore))
+tourney_results$chess_diff <- tourney_results$grating_chess-tourney_results$brating_chess
+tourney_results$sag_diff <- tourney_results$grating_sag-tourney_results$brating_sag
+tourney_results$dev_diff <- tourney_results$grating_dev-tourney_results$brating_dev
+
 tourney_results$diff <- tourney_results$gscore-tourney_results$bscore
 tourney_results$win <- ifelse(tourney_results$diff>0,1,0)
+tourney_results$win_factor <- as.factor(ifelse(tourney_results$diff>0,"win","loss"))
 
-train <- subset(tourney_results,season %in% c("G", "Q", "M", "R", "J", "A", "E", "L", "H", "C", "O"))
-cross <- subset(tourney_results,season %in% c("k","F","B","P"))
-test <- subset(tourney_results,season %in% c("I","N","D"))
+sample(LETTERS[1:18])
 
-marchRf <- randomForest(x=train[,14:19], y=train$win, keep.forest=T,
-                        xtest=cross[,14:19], ytest=cross$win,
-                        ntree=4500, norm.votes=T)
+train <- subset(tourney_results, season %in% c("C", "P", "I", "E", "O", "A", "J", "N", "D", "Q", "H"))
+cross <- subset(tourney_results, season %in% c("F", "K", "R", "B"))
+test <- subset(tourney_results, season %in% c("M", "G", "L"))
+
+marchRf <- randomForest(x=train[,c(14:19,22:24)], y=train$win, keep.forest=T,
+                        xtest=cross[,c(14:19,22:24)], ytest=cross$win, nperm=2,
+                        ntree=5000, norm.votes=T, strata=season, corr.bias=T)
 
 results <- cbind(predict(marchRf,
-                         newdata=rbind(train, cross)[,c(14:19,23)]),
-                 rbind(train, cross)[,23])
+                         newdata=rbind(train, cross)[,c(14:19,22:24,26)]),
+                 rbind(train, cross)[,26])
 colnames(results) <- c("pred","win")
 results <- as.data.frame(results)
 table(results$pred>.5 & results$win==1)
@@ -85,12 +93,31 @@ table(results$pred>.5 & results$win==1)
 library(Metrics)
 
 ## for training/cross data
-logLoss(results$win, results$pred) ##.3069634
+logLoss(results$win, results$pred) ##.2936813
 
-test_results <- cbind(predict(marchRf,test[,c(14:19,23)]),
-                      test[,23])
+test_results <- cbind(predict(marchRf,test[,c(14:19,22:24,26)]),
+                      test[,26])
 colnames(test_results) <- c("pred", "win")
 test_results <- as.data.frame(test_results)
 table(test_results$pred>.5 & test_results$win==1)
 
-logLoss(test_results$win, test_results$pred) ## .5166712
+logLoss(test_results$win, test_results$pred) ## .4948581
+
+other_march_rf <- randomForest(x=tourney_results[,c(14:19,22:24)],
+                               y=tourney_results$win, keep.forest=T,
+                               ntree=5000, norm.votes=T, nperm=2,
+                               strata=tourney_results$season, corr.bias=T)
+other_results <- cbind(predict(other_march_rf),
+                       tourney_results[,26])
+colnames(other_results) <- c("pred","win")
+other_results <- as.data.frame(other_results)
+table(other_results$pred>.5 & other_results$win==1)
+logLoss(other_results$win, other_results$pred) ## .5610305
+
+other_test_results <- cbind(predict(other_march_rf),
+                            tourney_results[,c(1,26)])
+other_test_results <- subset(other_test_results, season %in% c("M", "G", "L"))
+colnames(other_test_results) <- c("pred","season", "win")
+other_test_results <- as.data.frame(other_test_results)
+table(other_test_results$pred>.5 & other_test_results$win==1)
+logLoss(other_test_results$win, other_test_results$pred)
